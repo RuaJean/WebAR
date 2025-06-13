@@ -185,3 +185,9 @@ class App {
 };
 
 window.app = new App();
+
+const TARGET = {
+  lat: 6.2825,         // 6°16'57" N
+  lon: -75.6202778,    // 75°37'13" W
+  alt: 1913            // metros sobre el nivel del mar
+};
