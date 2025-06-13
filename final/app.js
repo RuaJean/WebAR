@@ -90,6 +90,9 @@ class App {
     this.xrSession.requestAnimationFrame(this.onXRFrame);
 
     this.xrSession.addEventListener("select", this.onSelect);
+
+    // Una vez que la sesión está lista, intentamos crear el objeto georreferenciado.
+    this.setupGeoObject();
   }
 
   /** Place a sunflower when the screen is tapped. */
@@ -182,12 +185,69 @@ class App {
     this.camera = new THREE.PerspectiveCamera();
     this.camera.matrixAutoUpdate = false;
   }
+
+  /**
+   * Calcula el vector de desplazamiento en metros desde un punto geográfico origen hasta
+   * un destino. El eje +X apunta al Este, +Z (en coordenadas de la API WebXR) apunta
+   * hacia el usuario (-Z es hacia el Norte en nuestro cálculo, por lo que devolvemos -north).
+   */
+  computeOffsetMeters(from, to) {
+    const R = 6378137; // Radio ecuatorial aproximado en metros
+    const dLat = THREE.Math.degToRad(to.lat - from.lat);
+    const dLon = THREE.Math.degToRad(to.lon - from.lon);
+    const latAvg = THREE.Math.degToRad((to.lat + from.lat) / 2);
+
+    const east = dLon * R * Math.cos(latAvg);   // metros hacia el Este
+    const north = dLat * R;                      // metros hacia el Norte
+    const up = (to.alt || 0) - (from.alt || 0);  // diferencia de altitud en metros
+
+    // En el sistema de coordenadas de three.js/WebXR: +X = Este, -Z = Norte
+    return new THREE.Vector3(east, up, -north);
+  }
+
+  /**
+   * Carga un modelo y lo sitúa a las coordenadas especificadas.
+   * Si el usuario no concede permisos de geolocalización, la función se ignora.
+   */
+  setupGeoObject() {
+    // Coordenadas objetivo en formato decimal
+    const TARGET = { lat: 6.2825, lon: -75.6203, alt: 1913 };
+
+    if (!navigator.geolocation) {
+      console.warn("Geolocalización no soportada en este dispositivo/navegador");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(position => {
+      const origin = {
+        lat: position.coords.latitude,
+        lon: position.coords.longitude,
+        alt: position.coords.altitude || 0
+      };
+
+      const offset = this.computeOffsetMeters(origin, TARGET);
+
+      // Cargamos un modelo GLTF (puedes sustituir la URL por tu propio recurso)
+      window.gltfLoader.load(
+        "https://immersive-web.github.io/webxr-samples/media/gltf/sunflower/sunflower.gltf",
+        gltf => {
+          this.geoObject = gltf.scene;
+          this.geoObject.position.copy(offset);
+          // Ajustes opcionales de escala/rotación
+          this.geoObject.scale.setScalar(1);
+
+          this.scene.add(this.geoObject);
+          console.log("Objeto georreferenciado añadido en", offset);
+        },
+        undefined,
+        err => console.error("Error cargando modelo georreferenciado", err)
+      );
+    },
+    err => {
+      console.warn("No se pudo obtener la posición del usuario", err);
+    },
+    { enableHighAccuracy: true });
+  }
 };
 
 window.app = new App();
-
-const TARGET = {
-  lat: 6.2825,         // 6°16'57" N
-  lon: -75.6202778,    // 75°37'13" W
-  alt: 1913            // metros sobre el nivel del mar
-};
