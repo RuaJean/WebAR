@@ -84,12 +84,12 @@ class App {
 
     // Cargar modelo 3D
     const mtlLoader = new THREE.MTLLoader();
-    mtlLoader.setPath('../assets/obj/');
+    mtlLoader.setPath('assets/obj/');
     mtlLoader.load('wooden watch tower2.mtl', (materials) => {
       materials.preload();
       const objLoader = new THREE.OBJLoader();
       objLoader.setMaterials(materials);
-      objLoader.setPath('../assets/obj/');
+      objLoader.setPath('assets/obj/');
       objLoader.load('wooden watch tower2.obj', (object) => {
         this.model = object;
         this.model.matrixAutoUpdate = false;
