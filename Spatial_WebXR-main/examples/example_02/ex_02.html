@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>WebXR Example 02</title>
+		<style>
+			body {
+				margin: 0;
+				padding: 0;
+				overflow-y: hidden;
+				overflow-x: hidden;
+			}
+		</style>
+	</head>
+	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.1/css/all.css" />
+	<body>
+		<script type="module">
+			import { App } from './ex_02.js';
+
+			document.addEventListener('DOMContentLoaded', function () {
+				const app = new App();
+				window.app = app;
+			});
+		</script>
+	</body>
+</html>

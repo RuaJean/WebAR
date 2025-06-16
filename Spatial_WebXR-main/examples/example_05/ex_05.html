@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>WebXR Example 05</title>
+		<meta charset="utf-8" />
+		<style>
+			body {
+				margin: 0;
+				padding: 0;
+				overflow-y: hidden;
+				overflow-x: hidden;
+			}
+			.holder {
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				border: solid;
+				bottom: 0px;
+				z-index: 10;
+				position: fixed;
+			}
+			.ar-button {
+				height: 10vh;
+				width: 40vw;
+				right: 0px;
+				font-size: 8em;
+				color: whitesmoke;
+				background-color: rgba(0, 128, 0, 0.5);
+				border-radius: 20px;
+			}
+			.instruction {
+				height: 10vh;
+				width: 58vw;
+				display: flex;
+				align-items: center;
+				padding-right: 1vw;
+				padding-left: 1vw;
+				text-align: center;
+				color: whitesmoke;
+				font-size: 2em;
+				font-weight: bold;
+				background-color: hsla(0, 0%, 39%, 0.5);
+				border-radius: 20px;
+				left: 0px;
+			}
+		</style>
+	</head>
+	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.1/css/all.css" />
+	<body>
+		<script type="module">
+			import { App } from './ex_05.js';
+
+			document.addEventListener('DOMContentLoaded', function () {
+				const app = new App();
+				window.app = app;
+			});
+		</script>
+		<div class="holder">
+			<div class="instruction">
+				Use the green button to start an AR session. Point camera to the floor and click on
+				the screen to load model
+			</div>
+			<button class="ar-button" onclick="window.app.showModel();">
+				<i class="fas fa-camera"></i>
+			</button>
+		</div>
+	</body>
+</html>
