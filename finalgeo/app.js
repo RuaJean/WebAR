@@ -43,9 +43,7 @@ class App {
   activateXR = async () => {
     try {
       this.xrSession = await navigator.xr.requestSession('immersive-ar', {
-        requiredFeatures: ['hit-test', 'dom-overlay', 'geolocation'],
-        geolocation: true,
-        alignEUS: 'y',
+        requiredFeatures: ['hit-test', 'dom-overlay', 'local'],
         domOverlay: { root: document.body }
       });
 
