@@ -24,7 +24,11 @@
     await navigator.xr.isSessionSupported('immersive-ar');
 
   if (isArSessionSupported) {
-    document.getElementById('enter-ar').addEventListener('click', window.app.activateXR);
+    const btn = document.getElementById('enter-ar');
+    btn && btn.addEventListener('click', () => {
+      // Aseguramos que window.app ya esté definido cuando el usuario hace clic
+      window.app.activateXR();
+    });
   } else {
     onNoXRDevice();
   }
