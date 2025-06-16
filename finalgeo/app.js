@@ -83,11 +83,18 @@ class App {
     this.geoAnchor = await XRGeospatialAnchor.createGeoAnchor(carto);
 
     // Cargar modelo 3D
-    const loader = new THREE.GLTFLoader();
-    loader.load('model.glb', (gltf) => {
-      this.model = gltf.scene;
-      this.model.matrixAutoUpdate = false;
-      this.scene.add(this.model);
+    const mtlLoader = new THREE.MTLLoader();
+    mtlLoader.setPath('../assets/obj/');
+    mtlLoader.load('wooden watch tower2.mtl', (materials) => {
+      materials.preload();
+      const objLoader = new THREE.OBJLoader();
+      objLoader.setMaterials(materials);
+      objLoader.setPath('../assets/obj/');
+      objLoader.load('wooden watch tower2.obj', (object) => {
+        this.model = object;
+        this.model.matrixAutoUpdate = false;
+        this.scene.add(this.model);
+      });
     });
 
     // Iniciar loop de render
