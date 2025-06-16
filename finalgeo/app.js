@@ -13,205 +13,146 @@
  * limitations under the License.
  */
 
-/**
- * Query for WebXR support. If there's no support for the `immersive-ar` mode,
- * show an error.
- */
+// Asegúrate de incluir en tu HTML:
+// <script src="https://unpkg.com/three@0.152.0/build/three.min.js"></script>
+// <script src="https://unpkg.com/three@0.152.0/examples/js/loaders/GLTFLoader.js"></script>
+// <script src="path/to/Cesium.js"></script>
+// <script src="path/to/webxr-geospatial.js"></script>
+
 (async function() {
-  if (!navigator.xr) {
-    onNoXRDevice();
-    return;
-  }
+  const isArSessionSupported = navigator.xr && navigator.xr.isSessionSupported &&
+    await navigator.xr.isSessionSupported('immersive-ar');
 
-  const isArSessionSupported = await navigator.xr.isSessionSupported("immersive-ar");
-  if (!isArSessionSupported) {
+  if (isArSessionSupported) {
+    document.getElementById('enter-ar').addEventListener('click', window.app.activateXR);
+  } else {
     onNoXRDevice();
-    return;
   }
-
-  // The Geospatial API is available, so we can start the AR experience.
-  // We'll check for availability and handle errors in activateXR().
-  document.getElementById("enter-ar").addEventListener("click", window.app.activateXR);
 })();
 
-/**
- * Container class to manage connecting to the WebXR Device API
- * and handle rendering on every frame.
- */
 class App {
-  /**
-   * Run when the Start AR button is pressed.
-   */
+  // Coordenadas geográficas deseadas
+  static GEO_LAT = Cesium.Math.toRadians(6 + 16/60 + 57/3600);       // 6°16'57"N
+  static GEO_LON = Cesium.Math.toRadians(-(75 + 37/60 + 14/3600));     // 75°37'14"W
+  static GEO_ALT = 1917;                                              // metros
+
   activateXR = async () => {
     try {
-      // Initialize a WebXR session using "immersive-ar".
-      // We're changing the required features to 'geospatial' and 'local'
-      // to use the Geospatial API.
-      this.xrSession = await navigator.xr.requestSession("immersive-ar", {
-        requiredFeatures: ['geospatial', 'local'],
+      this.xrSession = await navigator.xr.requestSession('immersive-ar', {
+        requiredFeatures: ['hit-test', 'dom-overlay', 'geolocation'],
+        geolocation: true,
+        alignEUS: 'y',
         domOverlay: { root: document.body }
       });
 
-      // Create the canvas that will contain our camera's background and our virtual scene.
       this.createXRCanvas();
-
-      // With everything set up, start the app.
       await this.onSessionStarted();
-    } catch(e) {
+    } catch (e) {
       console.error(e);
       onNoXRDevice();
     }
   }
 
-  /**
-   * Add a canvas element and initialize a WebGL context that is compatible with WebXR.
-   */
   createXRCanvas() {
-    this.canvas = document.createElement("canvas");
+    this.canvas = document.createElement('canvas');
     document.body.appendChild(this.canvas);
-    this.gl = this.canvas.getContext("webgl", {xrCompatible: true});
+    this.gl = this.canvas.getContext('webgl', { xrCompatible: true });
 
     this.xrSession.updateRenderState({
       baseLayer: new XRWebGLLayer(this.xrSession, this.gl)
     });
   }
 
-  /**
-   * Called when the XRSession has begun. Here we set up our three.js
-   * renderer, scene, and camera and attach our XRWebGLLayer to the
-   * XRSession and kick off the render loop.
-   */
   onSessionStarted = async () => {
-    // Add the `ar` class to our body, which will hide our 2D components
     document.body.classList.add('ar');
 
-    // To help with working with 3D on the web, we'll use three.js.
     this.setupThreeJs();
 
-    // Setup an XRReferenceSpace using the "local" coordinate system.
-    // The 'local' reference space is aligned with the 'geospatial' one.
+    // Referencias de espacio:
     this.localReferenceSpace = await this.xrSession.requestReferenceSpace('local');
+    this.geoReferenceSpace  = await this.xrSession.requestReferenceSpace('geospatial');
+    this.viewerSpace = await this.xrSession.requestReferenceSpace('viewer');
+    this.hitTestSource = await this.xrSession.requestHitTestSource({ space: this.viewerSpace });
 
-    // Place the object using geolocation.
-    this.placeObjectGeospatially();
+    // Crear ancla geoespacial en coordenadas fijas:
+    const carto = new Cesium.Cartographic(
+      App.GEO_LON,
+      App.GEO_LAT,
+      App.GEO_ALT
+    );
+    this.geoAnchor = await XRGeospatialAnchor.createGeoAnchor(carto);
 
-    // Start a rendering loop using this.onXRFrame.
+    // Cargar modelo 3D
+    const loader = new THREE.GLTFLoader();
+    loader.load('model.glb', (gltf) => {
+      this.model = gltf.scene;
+      this.model.matrixAutoUpdate = false;
+      this.scene.add(this.model);
+    });
+
+    // Iniciar loop de render
     this.xrSession.requestAnimationFrame(this.onXRFrame);
+    this.xrSession.addEventListener('select', this.onSelect);
   }
 
-  /**
-   * Uses the browser's Geolocation API to calculate the position of the 3D model
-   * based on the provided geographic coordinates and the user's current location.
-   */
-  placeObjectGeospatially = () => {
-    const modelLatitude = 6.2825;
-    const modelLongitude = -75.620556;
-    const modelAltitude = 1917; // in meters
-
-    const toRadians = (deg) => deg * Math.PI / 180;
-
-    const haversineDistance = (coords1, coords2) => {
-      const R = 6371e3; // Earth's radius in metres
-      const lat1 = toRadians(coords1.latitude);
-      const lat2 = toRadians(coords2.latitude);
-      const deltaLat = toRadians(coords2.latitude - coords1.latitude);
-      const deltaLon = toRadians(coords2.longitude - coords1.longitude);
-
-      const a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
-                Math.cos(lat1) * Math.cos(lat2) *
-                Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c;
-    };
-
-    const calculateBearing = (coords1, coords2) => {
-      const lat1 = toRadians(coords1.latitude);
-      const lon1 = toRadians(coords1.longitude);
-      const lat2 = toRadians(coords2.latitude);
-      const lon2 = toRadians(coords2.longitude);
-      const deltaLon = lon2 - lon1;
-
-      const y = Math.sin(deltaLon) * Math.cos(lat2);
-      const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLon);
-      return Math.atan2(y, x);
-    };
-
-    navigator.geolocation.getCurrentPosition(position => {
-      const userCoords = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        altitude: position.coords.altitude || 0
-      };
-
-      const modelCoords = { latitude: modelLatitude, longitude: modelLongitude, altitude: modelAltitude };
-
-      const distance = haversineDistance(userCoords, modelCoords);
-      const bearing = calculateBearing(userCoords, modelCoords);
-      const altitudeDifference = modelCoords.altitude - userCoords.altitude;
-
-      const x = distance * Math.sin(bearing);
-      const z = -distance * Math.cos(bearing);
-      const y = altitudeDifference;
-
-      if (window.sunflower) {
-        const clone = window.sunflower.clone();
-        clone.position.set(x, y, z);
-        this.scene.add(clone);
-
-        const shadowMesh = this.scene.children.find(c => c.name === 'shadowMesh');
-        if (shadowMesh) {
-          shadowMesh.position.y = clone.position.y;
-        }
-
-        this.stabilized = true;
-        document.body.classList.add('stabilized');
-      }
-    }, error => {
-      console.error("Error getting user's location:", error);
-      // You could show an error message to the user here.
-    }, { enableHighAccuracy: true });
-  }
-
-  /**
-   * Called on the XRSession's requestAnimationFrame.
-   * Called with the time and XRPresentationFrame.
-   */
-  onXRFrame = (time, frame) => {
-    // Queue up the next draw request.
-    this.xrSession.requestAnimationFrame(this.onXRFrame);
-
-    // Bind the graphics framebuffer to the baseLayer's framebuffer.
-    const framebuffer = this.xrSession.renderState.baseLayer.framebuffer
-    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, framebuffer)
-    this.renderer.setFramebuffer(framebuffer);
-
-    // Retrieve the pose of the device.
-    // XRFrame.getViewerPose can return null while the session attempts to establish tracking.
-    const pose = frame.getViewerPose(this.localReferenceSpace);
-    if (pose) {
-      // In mobile AR, we only have one view.
-      const view = pose.views[0];
-
-      const viewport = this.xrSession.renderState.baseLayer.getViewport(view);
-      this.renderer.setSize(viewport.width, viewport.height)
-
-      // Use the view's transform matrix and projection matrix to configure the THREE.camera.
-      this.camera.matrix.fromArray(view.transform.matrix)
-      this.camera.projectionMatrix.fromArray(view.projectionMatrix);
-      this.camera.updateMatrixWorld(true);
-
-      // Render the scene with THREE.WebGLRenderer.
-      this.renderer.render(this.scene, this.camera)
+  onSelect = () => {
+    // Ejemplo: clonar modelo en la posición actual del ancla
+    if (this.model) {
+      const clone = this.model.clone();
+      clone.matrix.copy(this.model.matrix);
+      clone.matrixAutoUpdate = false;
+      this.scene.add(clone);
     }
   }
 
-  /**
-   * Initialize three.js specific rendering code, including a WebGLRenderer,
-   * a demo scene, and a camera for viewing the 3D content.
-   */
+  onXRFrame = (time, frame) => {
+    this.xrSession.requestAnimationFrame(this.onXRFrame);
+
+    const framebuffer = this.xrSession.renderState.baseLayer.framebuffer;
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, framebuffer);
+    this.renderer.setFramebuffer(framebuffer);
+
+    const pose = frame.getViewerPose(this.localReferenceSpace);
+    if (pose) {
+      const view = pose.views[0];
+      const viewport = this.xrSession.renderState.baseLayer.getViewport(view);
+      this.renderer.setSize(viewport.width, viewport.height);
+
+      this.camera.matrix.fromArray(view.transform.matrix);
+      this.camera.projectionMatrix.fromArray(view.projectionMatrix);
+      this.camera.updateMatrixWorld(true);
+
+      // Hit-test para retículo (opcional)
+      const hits = frame.getHitTestResults(this.hitTestSource);
+      if (!this.stabilized && hits.length) {
+        this.stabilized = true;
+        document.body.classList.add('stabilized');
+      }
+      if (hits.length) {
+        const hitPose = hits[0].getPose(this.localReferenceSpace);
+        this.reticle.visible = true;
+        this.reticle.position.set(
+          hitPose.transform.position.x,
+          hitPose.transform.position.y,
+          hitPose.transform.position.z
+        );
+        this.reticle.updateMatrixWorld(true);
+      }
+
+      // Actualizar posición del modelo georreferenciado
+      if (this.geoAnchor && this.model) {
+        const geoPose = this.geoAnchor.getPose(this.geoReferenceSpace);
+        if (geoPose) {
+          this.model.matrix.fromArray(geoPose.transform.matrix);
+          this.model.updateMatrixWorld(true);
+        }
+      }
+
+      this.renderer.render(this.scene, this.camera);
+    }
+  }
+
   setupThreeJs() {
-    // To help with working with 3D on the web, we'll use three.js.
-    // Set up the WebGLRenderer, which handles rendering to our session's base layer.
     this.renderer = new THREE.WebGLRenderer({
       alpha: true,
       preserveDrawingBuffer: true,
@@ -222,15 +163,13 @@ class App {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    // Initialize our demo scene.
     this.scene = DemoUtils.createLitScene();
+    this.reticle = new Reticle();
+    this.scene.add(this.reticle);
 
-    // We'll update the camera matrices directly from API, so
-    // disable matrix auto updates so three.js doesn't attempt
-    // to handle the matrices independently.
     this.camera = new THREE.PerspectiveCamera();
     this.camera.matrixAutoUpdate = false;
   }
-};
+}
 
 window.app = new App();
