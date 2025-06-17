@@ -93,19 +93,16 @@ class App {
       console.warn('Geospatial no soportado, continuando sin ancla georreferenciada.', err);
     }
 
-    // Cargar modelo 3D
-    const mtlLoader = new THREE.MTLLoader();
-    mtlLoader.setPath('assets/obj/');
-    mtlLoader.load('wooden watch tower2.mtl', (materials) => {
-      materials.preload();
-      const objLoader = new THREE.OBJLoader();
-      objLoader.setMaterials(materials);
-      objLoader.setPath('assets/obj/');
-      objLoader.load('wooden watch tower2.obj', (object) => {
-        this.model = object;
-        this.model.matrixAutoUpdate = false;
-        this.scene.add(this.model);
-      });
+    // Cargar nuevo modelo 3D (Wood_house.obj)
+    const objLoader = new THREE.OBJLoader();
+    objLoader.setPath('assets/');
+    objLoader.load('Wood_house.obj', (object) => {
+      this.model = object;
+      // Ajusta la escala si es necesario
+      this.model.scale.set(0.02, 0.02, 0.02);
+      this.model.traverse((c)=>{ c.castShadow = true; c.receiveShadow = true; });
+      this.model.matrixAutoUpdate = true;
+      this.scene.add(this.model);
     });
 
     // Iniciar loop de render
@@ -155,6 +152,12 @@ class App {
           hitPose.transform.position.z
         );
         this.reticle.updateMatrixWorld(true);
+
+        // Si no tenemos geoAnchor y el modelo ya está cargado, plántalo una sola vez
+        if (!this.geoAnchor && this.model && !this.modelPlaced) {
+          this.model.position.copy(this.reticle.position);
+          this.modelPlaced = true;
+        }
       }
 
       // Actualizar posición del modelo georreferenciado
