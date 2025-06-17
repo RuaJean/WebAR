@@ -70,19 +70,26 @@ class App {
 
     this.setupThreeJs();
 
-    // Referencias de espacio:
+    // Referencias de espacio
     this.localReferenceSpace = await this.xrSession.requestReferenceSpace('local');
-    this.geoReferenceSpace  = await this.xrSession.requestReferenceSpace('geospatial');
     this.viewerSpace = await this.xrSession.requestReferenceSpace('viewer');
     this.hitTestSource = await this.xrSession.requestHitTestSource({ space: this.viewerSpace });
 
-    // Crear ancla geoespacial en coordenadas fijas:
-    const carto = new Cesium.Cartographic(
-      App.GEO_LON,
-      App.GEO_LAT,
-      App.GEO_ALT
-    );
-    this.geoAnchor = await XRGeospatialAnchor.createGeoAnchor(carto);
+    // Intentamos obtener geospatial si el navegador lo soporta
+    try {
+      this.geoReferenceSpace = await this.xrSession.requestReferenceSpace('geospatial');
+
+      const carto = new Cesium.Cartographic(
+        App.GEO_LON,
+        App.GEO_LAT,
+        App.GEO_ALT
+      );
+      if (window.XRGeospatialAnchor && carto) {
+        this.geoAnchor = await XRGeospatialAnchor.createGeoAnchor(carto);
+      }
+    } catch (err) {
+      console.warn('Geospatial no soportado, continuando sin ancla georreferenciada.', err);
+    }
 
     // Cargar modelo 3D
     const mtlLoader = new THREE.MTLLoader();
