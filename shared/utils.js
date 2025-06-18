@@ -127,4 +127,5 @@ window.DemoUtils = {
  */
 function onNoXRDevice() {
   document.body.classList.add('unsupported');
+  console.warn('WebXR unsupported: displaying unsupported browser message.');
 }
