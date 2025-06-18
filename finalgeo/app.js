@@ -108,7 +108,7 @@ class App {
     // Cargar nuevo modelo 3D (Wood_house.obj)
     const objLoader = new THREE.OBJLoader();
     objLoader.setPath('assets/');
-    objLoader.load('Wood_house.obj', (object) => {
+    objLoader.load('Santa_Maria_resized.obj', (object) => {
       this.model = object;
       // Ajusta la escala si es necesario
       this.model.scale.set(3, 3, 3);
