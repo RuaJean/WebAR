@@ -105,7 +105,7 @@ class App {
       }
     }, 5000);
 
-    // Cargar nuevo modelo 3D (Wood_house.obj)
+    // Cargar nuevo modelo 3D (Santa maría)
     const objLoader = new THREE.OBJLoader();
     objLoader.setPath('assets/');
     objLoader.load('Santa_Maria_resized.obj', (object) => {
@@ -115,7 +115,7 @@ class App {
       this.model.traverse((c)=>{ c.castShadow = true; c.receiveShadow = true; });
       this.model.matrixAutoUpdate = false; // para geoAnchor; se habilitará en fallback cuando se coloque
       this.scene.add(this.model);
-      console.log('Modelo Wood_house cargado');
+      console.log('Modelo Santa maría cargado');
     });
 
     // Iniciar loop de render
