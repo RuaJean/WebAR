@@ -36,9 +36,9 @@
 
 class App {
   // Coordenadas geográficas deseadas
-  static GEO_LAT = Cesium.Math.toRadians(6 + 16/60 + 57/3600);       // 6°16'57"N
-  static GEO_LON = Cesium.Math.toRadians(-(75 + 37/60 + 14/3600));     // 75°37'14"W
-  static GEO_ALT = 1917;                                              // metros
+  static GEO_LAT = Cesium.Math.toRadians(6 + 16/60 + 58/3600);       // 6°16'58"N
+  static GEO_LON = Cesium.Math.toRadians(-(75 + 37/60 + 15/3600));     // 75°37'15"W
+  static GEO_ALT = 1926;                                              // metros
 
   activateXR = async () => {
     try {
