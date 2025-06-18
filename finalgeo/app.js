@@ -78,9 +78,12 @@ class App {
     this.hitTestSource = await this.xrSession.requestHitTestSource({ space: this.viewerSpace });
 
     this.geoReady = false;
+    this.anchorReferenceSpace = this.localReferenceSpace; // por defecto
+
     try {
       console.log('Solicitando referenceSpace geospatial…');
       this.geoReferenceSpace = await this.xrSession.requestReferenceSpace('geospatial');
+      this.anchorReferenceSpace = this.geoReferenceSpace;
 
       const carto = new Cesium.Cartographic(
         App.GEO_LON,
@@ -94,7 +97,22 @@ class App {
         console.log('GeoAnchor creado con éxito');
       }
     } catch (err) {
-      console.warn('Geospatial no soportado o falló la creación del ancla:', err);
+      console.warn('No se pudo obtener referenceSpace geospatial:', err);
+      // Aunque no exista referenceSpace geospatial, intentamos crear el ancla igualmente
+      if (window.XRGeospatialAnchor) {
+        try {
+          const carto = new Cesium.Cartographic(
+            App.GEO_LON,
+            App.GEO_LAT,
+            App.GEO_ALT
+          );
+          this.geoAnchor = await XRGeospatialAnchor.createGeoAnchor(carto);
+          this.geoReady = true;
+          console.log('GeoAnchor creado (con referenceSpace local)');
+        } catch(e) {
+          console.warn('Falló la creación de XRGeospatialAnchor:', e);
+        }
+      }
     }
 
     // Si en 5 s no hay geoAnchor, activamos modo fallback
@@ -178,7 +196,7 @@ class App {
 
       // Actualizar posición del modelo georreferenciado
       if (this.geoAnchor && this.model) {
-        const geoPose = this.geoAnchor.getPose(this.geoReferenceSpace);
+        const geoPose = this.geoAnchor.getPose(this.anchorReferenceSpace);
         if (geoPose) {
           this.model.matrix.fromArray(geoPose.transform.matrix);
           this.model.updateMatrixWorld(true);
