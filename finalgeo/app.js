@@ -77,8 +77,9 @@ class App {
     this.viewerSpace = await this.xrSession.requestReferenceSpace('viewer');
     this.hitTestSource = await this.xrSession.requestHitTestSource({ space: this.viewerSpace });
 
-    // Intentamos obtener geospatial si el navegador lo soporta
+    this.geoReady = false;
     try {
+      console.log('Solicitando referenceSpace geospatial…');
       this.geoReferenceSpace = await this.xrSession.requestReferenceSpace('geospatial');
 
       const carto = new Cesium.Cartographic(
@@ -87,11 +88,22 @@ class App {
         App.GEO_ALT
       );
       if (window.XRGeospatialAnchor && carto) {
+        console.log('Creando XRGeospatialAnchor…');
         this.geoAnchor = await XRGeospatialAnchor.createGeoAnchor(carto);
+        this.geoReady = true;
+        console.log('GeoAnchor creado con éxito');
       }
     } catch (err) {
-      console.warn('Geospatial no soportado, continuando sin ancla georreferenciada.', err);
+      console.warn('Geospatial no soportado o falló la creación del ancla:', err);
     }
+
+    // Si en 5 s no hay geoAnchor, activamos modo fallback
+    setTimeout(() => {
+      if (!this.geoReady) {
+        console.warn('Activando modo fallback por falta de geoAnchor');
+        this.fallbackMode = true;
+      }
+    }, 5000);
 
     // Cargar nuevo modelo 3D (Wood_house.obj)
     const objLoader = new THREE.OBJLoader();
@@ -99,10 +111,11 @@ class App {
     objLoader.load('Wood_house.obj', (object) => {
       this.model = object;
       // Ajusta la escala si es necesario
-      this.model.scale.set(0.02, 0.02, 0.02);
+      this.model.scale.set(3, 3, 3);
       this.model.traverse((c)=>{ c.castShadow = true; c.receiveShadow = true; });
-      this.model.matrixAutoUpdate = true;
+      this.model.matrixAutoUpdate = false; // para geoAnchor; se habilitará en fallback cuando se coloque
       this.scene.add(this.model);
+      console.log('Modelo Wood_house cargado');
     });
 
     // Iniciar loop de render
@@ -145,7 +158,8 @@ class App {
       }
       if (hits.length) {
         const hitPose = hits[0].getPose(this.localReferenceSpace);
-        this.reticle.visible = true;
+        // Si ya tenemos geo ancla no necesitamos mostrar retículo
+        this.reticle.visible = !(this.geoReady);
         this.reticle.position.set(
           hitPose.transform.position.x,
           hitPose.transform.position.y,
@@ -153,10 +167,12 @@ class App {
         );
         this.reticle.updateMatrixWorld(true);
 
-        // Si no tenemos geoAnchor y el modelo ya está cargado, plántalo una sola vez
-        if (!this.geoAnchor && this.model && !this.modelPlaced) {
+        // Fallback: colocar modelo en primer hit-test
+        if (this.fallbackMode && this.model && !this.modelPlaced) {
           this.model.position.copy(this.reticle.position);
+          this.model.matrixAutoUpdate = true;
           this.modelPlaced = true;
+          console.log('Modelo colocado mediante fallback en la primera superficie.');
         }
       }
 
