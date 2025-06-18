@@ -41,6 +41,7 @@ class App {
   static GEO_ALT = 1926;                                              // metros
 
   activateXR = async () => {
+    console.info('activateXR: iniciando solicitud de sesión XR');
     try {
       this.xrSession = await navigator.xr.requestSession('immersive-ar', {
         requiredFeatures: ['hit-test', 'dom-overlay', 'local'],
@@ -48,16 +49,18 @@ class App {
         alignEUS: 'y',
         domOverlay: { root: document.body }
       });
+      console.info('activateXR: XRSession creada');
 
       this.createXRCanvas();
       await this.onSessionStarted();
     } catch (e) {
-      console.error(e);
+      console.error('activateXR error', e);
       onNoXRDevice();
     }
   }
 
   createXRCanvas() {
+    console.debug('createXRCanvas');
     this.canvas = document.createElement('canvas');
     document.body.appendChild(this.canvas);
     this.gl = this.canvas.getContext('webgl', { xrCompatible: true });
@@ -128,12 +131,17 @@ class App {
     objLoader.setPath('assets/');
     objLoader.load('barn.obj', (object) => {
       this.model = object;
+      console.info('OBJ cargado, vértices totales:', this.model.children.length);
       // Ajusta la escala si es necesario
       this.model.scale.set(3, 3, 3);
       this.model.traverse((c)=>{ c.castShadow = true; c.receiveShadow = true; });
       this.model.matrixAutoUpdate = false; // para geoAnchor; se habilitará en fallback cuando se coloque
       this.scene.add(this.model);
       console.log('Modelo Santa maría cargado');
+    }, (xhr)=>{
+      console.debug(`Cargando OBJ… ${(xhr.loaded/xhr.total*100).toFixed(1)}%`);
+    }, (err)=>{
+      console.error('Error cargando OBJ', err);
     });
 
     // Iniciar loop de render
@@ -152,6 +160,7 @@ class App {
   }
 
   onXRFrame = (time, frame) => {
+    if(!this._frameCount){this._frameCount=0;} if(!(this._frameCount++ % 60)){ console.debug('onXRFrame tick 60'); }
     this.xrSession.requestAnimationFrame(this.onXRFrame);
 
     const framebuffer = this.xrSession.renderState.baseLayer.framebuffer;
