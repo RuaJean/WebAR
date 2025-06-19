@@ -35,10 +35,24 @@
 })();
 
 class App {
-  // Coordenadas geográficas deseadas
-  static GEO_LAT = Cesium.Math.toRadians(6 + 16/60 + 58/3600);       // 6°16'58"N
-  static GEO_LON = Cesium.Math.toRadians(-(75 + 37/60 + 15/3600));     // 75°37'15"W
-  static GEO_ALT = 1926;                                              // metros
+  // Update coordinates constants and add helpers
+  static TARGET_LAT = 6 + 16/60 + 58/3600; // grados
+  static TARGET_LON = -(75 + 37/60 + 15/3600); // grados (oeste negativo)
+  static TARGET_ALT = 1926; // metros
+
+  /**
+   * Convierte diferencia lat/lon (en grados) a metros aproximados usando
+   * la proyección equirectangular (suficiente para distancias < 1-2 km).
+   */
+  _latLonToMeters(dLatDeg, dLonDeg, lat0Deg) {
+    const R = 6378137; // Radio WGS84
+    const dLat = THREE.MathUtils.degToRad(dLatDeg);
+    const dLon = THREE.MathUtils.degToRad(dLonDeg);
+    const lat0 = THREE.MathUtils.degToRad(lat0Deg);
+    const x = dLon * Math.cos(lat0) * R; // Este (+X)
+    const z = dLat * R;                  // Norte (+Z)
+    return new THREE.Vector3(x, 0, z);
+  }
 
   activateXR = async () => {
     console.info('activateXR: iniciando solicitud de sesión XR');
@@ -75,69 +89,43 @@ class App {
 
     this.setupThreeJs();
 
-    // Referencias de espacio
+    // Referencias de espacio y hit-test
     this.localReferenceSpace = await this.xrSession.requestReferenceSpace('local');
     this.viewerSpace = await this.xrSession.requestReferenceSpace('viewer');
     this.hitTestSource = await this.xrSession.requestHitTestSource({ space: this.viewerSpace });
 
-    this.geoReady = false;
-    this.anchorReferenceSpace = this.localReferenceSpace; // por defecto
+    // Paso 1: obtener ubicación del usuario UNA sola vez
+    this.gpsReady = false;
+    navigator.geolocation.getCurrentPosition((pos)=>{
+      const userLat = pos.coords.latitude;
+      const userLon = pos.coords.longitude;
+      const userAlt = pos.coords.altitude || 0;
 
-    try {
-      console.log('Solicitando referenceSpace geospatial…');
-      this.geoReferenceSpace = await this.xrSession.requestReferenceSpace('geospatial');
-      this.anchorReferenceSpace = this.geoReferenceSpace;
-
-      const carto = new Cesium.Cartographic(
-        App.GEO_LON,
-        App.GEO_LAT,
-        App.GEO_ALT
-      );
-      if (window.XRGeospatialAnchor && carto) {
-        console.log('Creando XRGeospatialAnchor…');
-        this.geoAnchor = await XRGeospatialAnchor.createGeoAnchor(carto);
-        this.geoReady = true;
-        console.log('GeoAnchor creado con éxito');
-      }
-    } catch (err) {
-      console.warn('No se pudo obtener referenceSpace geospatial:', err);
-      // Aunque no exista referenceSpace geospatial, intentamos crear el ancla igualmente
-      if (window.XRGeospatialAnchor) {
-        try {
-          const carto = new Cesium.Cartographic(
-            App.GEO_LON,
-            App.GEO_LAT,
-            App.GEO_ALT
-          );
-          this.geoAnchor = await XRGeospatialAnchor.createGeoAnchor(carto);
-          this.geoReady = true;
-          console.log('GeoAnchor creado (con referenceSpace local)');
-        } catch(e) {
-          console.warn('Falló la creación de XRGeospatialAnchor:', e);
-        }
-      }
-    }
-
-    // Si en 5 s no hay geoAnchor, activamos modo fallback
-    setTimeout(() => {
-      if (!this.geoReady) {
-        console.warn('Activando modo fallback por falta de geoAnchor');
-        this.fallbackMode = true;
-      }
-    }, 5000);
+      const dLat = App.TARGET_LAT - userLat;
+      const dLon = App.TARGET_LON - userLon;
+      const horizontal = this._latLonToMeters(dLat, dLon, userLat);
+      const dAlt = App.TARGET_ALT - userAlt;
+      horizontal.y = dAlt;
+      // Guardamos desplazamiento EN metros respecto al punto de inicio
+      this.targetOffset = horizontal; // Vector3 (X este, Y arriba, Z norte)
+      this.gpsReady = true;
+      console.log('Offset metros al objetivo:', horizontal);
+    }, (e)=>{
+      console.error('Error GPS:', e);
+      this.gpsReady = false; // seguiremos esperando retículo y usuario podrá tocar
+    }, { enableHighAccuracy:true, timeout:5000 });
 
     // Cargar nuevo modelo 3D (Santa maría)
     const objLoader = new THREE.OBJLoader();
     objLoader.setPath('assets/');
     objLoader.load('barn.obj', (object) => {
       this.model = object;
-      console.info('OBJ cargado, vértices totales:', this.model.children.length);
       // Ajusta la escala si es necesario
-      this.model.scale.set(3, 3, 3);
+      this.model.scale.set(0.02, 0.02, 0.02);
       this.model.traverse((c)=>{ c.castShadow = true; c.receiveShadow = true; });
-      this.model.matrixAutoUpdate = false; // para geoAnchor; se habilitará en fallback cuando se coloque
+      this.model.matrixAutoUpdate = true;
       this.scene.add(this.model);
-      console.log('Modelo Santa maría cargado');
+      console.log('Modelo barn cargado');
     }, (xhr)=>{
       console.debug(`Cargando OBJ… ${(xhr.loaded/xhr.total*100).toFixed(1)}%`);
     }, (err)=>{
@@ -186,7 +174,7 @@ class App {
       if (hits.length) {
         const hitPose = hits[0].getPose(this.localReferenceSpace);
         // Si ya tenemos geo ancla no necesitamos mostrar retículo
-        this.reticle.visible = !(this.geoReady);
+        this.reticle.visible = !(this.gpsReady);
         this.reticle.position.set(
           hitPose.transform.position.x,
           hitPose.transform.position.y,
@@ -194,21 +182,30 @@ class App {
         );
         this.reticle.updateMatrixWorld(true);
 
-        // Fallback: colocar modelo en primer hit-test
-        if (this.fallbackMode && this.model && !this.modelPlaced) {
-          this.model.position.copy(this.reticle.position);
-          this.model.matrixAutoUpdate = true;
-          this.modelPlaced = true;
-          console.log('Modelo colocado mediante fallback en la primera superficie.');
-        }
-      }
+        // Si aún no hemos colocado modelo y tenemos GPS + retículo
+        if (!this.modelPlaced && this.gpsReady && hits.length && this.model) {
+          const hitPose = hits[0].getPose(this.localReferenceSpace);
+          // Tomamos la base (suelo bajo el usuario)
+          const basePos = new THREE.Vector3(
+            hitPose.transform.position.x,
+            hitPose.transform.position.y,
+            hitPose.transform.position.z);
 
-      // Actualizar posición del modelo georreferenciado
-      if (this.geoAnchor && this.model) {
-        const geoPose = this.geoAnchor.getPose(this.anchorReferenceSpace);
-        if (geoPose) {
-          this.model.matrix.fromArray(geoPose.transform.matrix);
+          // Construimos ejes ENU locales a partir de cámara (Right = +X Este, Forward = -Z Norte)
+          const camMatrix = new THREE.Matrix4().fromArray(view.transform.matrix);
+          const camRight = new THREE.Vector3(1,0,0).applyMatrix4(camMatrix).sub(new THREE.Vector3().fromMatrixPosition(camMatrix)).setY(0).normalize();
+          const camForward = new THREE.Vector3(0,0,-1).applyMatrix4(camMatrix).sub(new THREE.Vector3().fromMatrixPosition(camMatrix)).setY(0).normalize();
+
+          // Proyecto offset en sistema local
+          const offsetWorld = camRight.clone().multiplyScalar(this.targetOffset.x)  // Este
+                                .add(camForward.clone().multiplyScalar(-this.targetOffset.z)) // Norte -> -Z
+                                .setY(this.targetOffset.y);
+
+          const finalPos = basePos.clone().add(offsetWorld);
+          this.model.position.copy(finalPos);
           this.model.updateMatrixWorld(true);
+          this.modelPlaced = true;
+          console.log('Modelo colocado con offset ENU');
         }
       }
 
