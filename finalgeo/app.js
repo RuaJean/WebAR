@@ -119,20 +119,21 @@ class App {
       this.gpsReady = false; // seguiremos esperando retículo y usuario podrá tocar
     }, { enableHighAccuracy:true, timeout:5000 });
 
-    // Cargar el modelo 3D de la casa de madera
-    const loader = new THREE.GLTFLoader();
-    loader.load('assets/wooden_house/scene.gltf', (gltf) => {
-      this.model = gltf.scene;
-      // Ajusta la escala si es necesario. Este valor es un punto de partida.
-      this.model.scale.set(0.1, 0.1, 0.1);
+    // Cargar el modelo 3D Wood_house.obj
+    const objLoader = new THREE.OBJLoader();
+    objLoader.setPath('assets/');
+    objLoader.load('Wood_house.obj', (object) => {
+      this.model = object;
+      // Ajusta la escala si es necesario.
+      this.model.scale.set(0.1, 0.1, 0.1); 
       this.model.traverse((c)=>{ c.castShadow = true; c.receiveShadow = true; });
       this.model.matrixAutoUpdate = true;
       this.scene.add(this.model);
-      console.log('Modelo de casa de madera cargado.');
+      console.log('Modelo Wood_house.obj cargado.');
     }, (xhr) => {
-      console.debug(`Cargando GLTF... ${(xhr.loaded/xhr.total*100).toFixed(1)}%`);
+      console.debug(`Cargando OBJ... ${(xhr.loaded/xhr.total*100).toFixed(1)}%`);
     }, (err) => {
-      console.error('Error cargando GLTF', err);
+      console.error('Error cargando OBJ', err);
     });
 
     // Iniciar loop de render
