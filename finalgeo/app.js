@@ -100,6 +100,10 @@ class App {
       const userLat = pos.coords.latitude;
       const userLon = pos.coords.longitude;
       const userAlt = pos.coords.altitude || 0;
+      console.info('[GPS] Posición usuario:', {
+        lat:userLat, lon:userLon, alt:userAlt,
+        accuracy: pos.coords.accuracy, altAcc: pos.coords.altitudeAccuracy
+      });
 
       const dLat = App.TARGET_LAT - userLat;
       const dLon = App.TARGET_LON - userLon;
@@ -109,7 +113,7 @@ class App {
       // Guardamos desplazamiento EN metros respecto al punto de inicio
       this.targetOffset = horizontal; // Vector3 (X este, Y arriba, Z norte)
       this.gpsReady = true;
-      console.log('Offset metros al objetivo:', horizontal);
+      console.info('[GPS] Offset ENU objetivo (m):', horizontal);
     }, (e)=>{
       console.error('Error GPS:', e);
       this.gpsReady = false; // seguiremos esperando retículo y usuario podrá tocar
@@ -205,9 +209,11 @@ class App {
           this.model.position.copy(finalPos);
           this.model.updateMatrixWorld(true);
           this.modelPlaced = true;
-          console.log('Modelo colocado con offset ENU');
+          console.info('[Placement] base', basePos, 'offsetWorld', offsetWorld, 'final', finalPos);
         }
       }
+
+      console.trace('[Frame] hits:', hits.length, 'stabilized:', this.stabilized);
 
       this.renderer.render(this.scene, this.camera);
     }

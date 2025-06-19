@@ -1,6 +1,7 @@
 // remoteLogger.js
 // Enlaza los métodos de console para enviar los logs a un endpoint PHP mediante sendBeacon/fetch.
 (() => {
+  const sessionId = (Date.now().toString(36)+Math.random().toString(36).substr(2,5)).toUpperCase();
   function serialize(arg) {
     try {
       if (arg instanceof Error) {
@@ -19,6 +20,8 @@
       message,
       url: location.href,
       ua: navigator.userAgent,
+      sessionId,
+      lang: navigator.language,
       ts: Date.now()
     });
     try {
@@ -39,7 +42,7 @@
   }
 
   window.initRemoteLogger = function (endpoint) {
-    const levels = ['log', 'info', 'warn', 'error', 'debug'];
+    const levels = ['log', 'info', 'warn', 'error', 'debug', 'trace'];
     levels.forEach(level => {
       const original = console[level] ? console[level].bind(console) : console.log.bind(console);
       console[level] = (...args) => {
@@ -56,6 +59,6 @@
       post(endpoint, 'unhandledrejection', serialize(evt.reason));
     });
 
-    console.info('remoteLogger inicializado, enviando a ' + endpoint);
+    console.info('remoteLogger inicializado, enviando a ' + endpoint + ' id=' + sessionId);
   };
 })(); 
