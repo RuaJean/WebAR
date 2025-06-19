@@ -196,8 +196,9 @@ class App {
 
           // Construimos ejes ENU locales a partir de cámara (Right = +X Este, Forward = -Z Norte)
           const camMatrix = new THREE.Matrix4().fromArray(view.transform.matrix);
-          const camRight = new THREE.Vector3(1,0,0).applyMatrix4(camMatrix).sub(new THREE.Vector3().fromMatrixPosition(camMatrix)).setY(0).normalize();
-          const camForward = new THREE.Vector3(0,0,-1).applyMatrix4(camMatrix).sub(new THREE.Vector3().fromMatrixPosition(camMatrix)).setY(0).normalize();
+          const camOrigin = new THREE.Vector3().setFromMatrixPosition(camMatrix);
+          const camRight = new THREE.Vector3(1,0,0).applyMatrix4(camMatrix).sub(camOrigin).setY(0).normalize();
+          const camForward = new THREE.Vector3(0,0,-1).applyMatrix4(camMatrix).sub(camOrigin).setY(0).normalize();
 
           // Proyecto offset en sistema local
           const offsetWorld = camRight.clone().multiplyScalar(this.targetOffset.x)  // Este
