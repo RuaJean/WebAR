@@ -92,15 +92,12 @@ class App {
     this.xrSession.addEventListener("select", this.onSelect);
   }
 
-  /** Place a sunflower when the screen is tapped. */
+  /** Place a model when the screen is tapped. */
   onSelect = () => {
-    if (window.sunflower) {
-      const clone = window.sunflower.clone();
+    if (this.model) {
+      const clone = this.model.clone();
       clone.position.copy(this.reticle.position);
-      this.scene.add(clone)
-
-      const shadowMesh = this.scene.children.find(c => c.name === 'shadowMesh');
-      shadowMesh.position.y = clone.position.y;
+      this.scene.add(clone);
     }
   }
 
@@ -175,6 +172,21 @@ class App {
     this.scene = DemoUtils.createLitScene();
     this.reticle = new Reticle();
     this.scene.add(this.reticle);
+
+    // Load the model
+    const loader = new THREE.GLTFLoader();
+    loader.load('http://jeanrua.com/models/Santa_Maria_Prueba_AR.glb', (gltf) => {
+      this.model = gltf.scene;
+      this.model.scale.set(0.1, 0.1, 0.1);
+      this.model.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+    }, undefined, (error) => {
+      console.error('An error happened while loading the model:', error);
+    });
 
     // We'll update the camera matrices directly from API, so
     // disable matrix auto updates so three.js doesn't attempt
