@@ -132,7 +132,7 @@ class App {
     }, (xhr) => {
       console.debug(`Cargando GLB... ${(xhr.loaded/xhr.total*100).toFixed(1)}%`);
     }, (err) => {
-      console.error('Error cargando GLB', err);
+      console.error('Error cargando GLB. Mensaje:', err.message, 'Error:', err.error, 'Evento completo:', err);
     });
 
     // Iniciar loop de render
