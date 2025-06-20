@@ -120,19 +120,33 @@ class App {
     }, { enableHighAccuracy:true, timeout:5000 });
 
     // Cargar el modelo 3D desde URL
+    const MODEL_URL = 'https://jeanrua.com/models/Santa_Maria_Prueba_AR.glb';
     const loader = new THREE.GLTFLoader();
-    loader.load('http://jeanrua.com/models/Santa_Maria_Prueba_AR.glb', (gltf) => {
+    loader.setCrossOrigin('anonymous');
+
+    // Hooks globales al LoadingManager para depuración adicional
+    loader.manager.onError = (url) => {
+      console.error('[LoaderManager] Error al cargar recurso:', url);
+    };
+
+    loader.load(MODEL_URL, (gltf) => {
       this.model = gltf.scene;
-      // Ajusta la escala si es necesario. Iniciamos con 1, 1, 1.
+      // Ajusta la escala si es necesario.
       this.model.scale.set(1, 1, 1);
-      this.model.traverse((c)=>{ c.castShadow = true; c.receiveShadow = true; });
+      this.model.traverse((c) => { c.castShadow = true; c.receiveShadow = true; });
       this.model.matrixAutoUpdate = true;
       this.scene.add(this.model);
       console.log('Modelo Santa_Maria_Prueba_AR.glb cargado.');
     }, (xhr) => {
-      console.debug(`Cargando GLB... ${(xhr.loaded/xhr.total*100).toFixed(1)}%`);
-    }, (err) => {
-      console.error('Error cargando GLB. Mensaje:', err.message, 'Error:', err.error, 'Evento completo:', err);
+      console.debug(`Cargando GLB... ${(xhr.loaded / xhr.total * 100).toFixed(1)}%`);
+    }, (errEvt) => {
+      const t = errEvt && errEvt.target ? errEvt.target : {};
+      console.error('Error cargando GLB', {
+        status: t.status,
+        statusText: t.statusText,
+        responseURL: t.responseURL,
+        response: t.response,
+      }, 'Evento completo:', errEvt);
     });
 
     // Iniciar loop de render
