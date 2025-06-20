@@ -94,14 +94,41 @@ class App {
 
   /** Place a sunflower when the screen is tapped. */
   onSelect = () => {
-    if (window.sunflower) {
-      const clone = window.sunflower.clone();
-      clone.position.copy(this.reticle.position);
-      this.scene.add(clone)
-
-      const shadowMesh = this.scene.children.find(c => c.name === 'shadowMesh');
-      shadowMesh.position.y = clone.position.y;
+    // Si el modelo ya está colocado, no hacemos nada.
+    if (this.modelPlaced) {
+      return;
     }
+
+    // Marcamos que el modelo se está colocando para evitar dobles cargas.
+    this.modelPlaced = true;
+
+    // Cargar el modelo GLB y añadirlo a la escena.
+    const loader = new THREE.GLTFLoader();
+    loader.setCrossOrigin('anonymous');
+    loader.load(this.modelUrl, (gltf) => {
+      const model = gltf.scene;
+
+      // Habilitar sombras en todas las mallas del modelo.
+      model.traverse((node) => {
+        if (node.isMesh) {
+          node.castShadow = true;
+          node.receiveShadow = true;
+        }
+      });
+
+      // Posicionar el modelo donde está el retículo.
+      model.position.copy(this.reticle.position);
+      this.scene.add(model);
+
+      // Ocultamos el retículo una vez colocado el modelo.
+      this.reticle.visible = false;
+
+      // Ajustar el plano receptor de sombras a la altura del modelo.
+      const shadowMesh = this.scene.children.find(c => c.name === 'shadowMesh');
+      if (shadowMesh) {
+        shadowMesh.position.y = model.position.y;
+      }
+    });
   }
 
   /**
@@ -140,13 +167,16 @@ class App {
         this.stabilized = true;
         document.body.classList.add('stabilized');
       }
-      if (hitTestResults.length > 0) {
+      if (hitTestResults.length > 0 && !this.modelPlaced) {
         const hitPose = hitTestResults[0].getPose(this.localReferenceSpace);
 
         // Update the reticle position
         this.reticle.visible = true;
         this.reticle.position.set(hitPose.transform.position.x, hitPose.transform.position.y, hitPose.transform.position.z)
         this.reticle.updateMatrixWorld(true);
+      }
+      if (this.modelPlaced) {
+        this.reticle.visible = false;
       }
 
       // Render the scene with THREE.WebGLRenderer.
@@ -181,6 +211,10 @@ class App {
     // to handle the matrices independently.
     this.camera = new THREE.PerspectiveCamera();
     this.camera.matrixAutoUpdate = false;
+
+    // Agregamos propiedades para controlar la carga única del modelo
+    this.modelPlaced = false;
+    this.modelUrl = 'https://jeanrua.com/models/Santa_Maria_resized.glb';
   }
 };
 
