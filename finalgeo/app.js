@@ -119,21 +119,20 @@ class App {
       this.gpsReady = false; // seguiremos esperando retículo y usuario podrá tocar
     }, { enableHighAccuracy:true, timeout:5000 });
 
-    // Cargar el modelo 3D Wood_house.obj
-    const objLoader = new THREE.OBJLoader();
-    objLoader.setPath('assets/');
-    objLoader.load('Wood_house.obj', (object) => {
-      this.model = object;
-      // Ajusta la escala si es necesario.
-      this.model.scale.set(0.1, 0.1, 0.1); 
+    // Cargar el modelo 3D desde URL
+    const loader = new THREE.GLTFLoader();
+    loader.load('http://jeanrua.com/models/Santa_Maria_Prueba_AR.glb', (gltf) => {
+      this.model = gltf.scene;
+      // Ajusta la escala si es necesario. Iniciamos con 1, 1, 1.
+      this.model.scale.set(1, 1, 1);
       this.model.traverse((c)=>{ c.castShadow = true; c.receiveShadow = true; });
       this.model.matrixAutoUpdate = true;
       this.scene.add(this.model);
-      console.log('Modelo Wood_house.obj cargado.');
+      console.log('Modelo Santa_Maria_Prueba_AR.glb cargado.');
     }, (xhr) => {
-      console.debug(`Cargando OBJ... ${(xhr.loaded/xhr.total*100).toFixed(1)}%`);
+      console.debug(`Cargando GLB... ${(xhr.loaded/xhr.total*100).toFixed(1)}%`);
     }, (err) => {
-      console.error('Error cargando OBJ', err);
+      console.error('Error cargando GLB', err);
     });
 
     // Iniciar loop de render

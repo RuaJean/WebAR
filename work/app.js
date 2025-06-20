@@ -37,7 +37,7 @@ class App {
   activateXR = async () => {
     try {
       // Initialize a WebXR session using "immersive-ar".
-      this.xrSession = /* TODO */
+      this.xrSession = /* TODO */;
 
       // Create the canvas that will contain our camera's background and our virtual scene.
       this.createXRCanvas();
@@ -68,7 +68,7 @@ class App {
    */
   async onSessionStarted() {
     // Add the `ar` class to our body, which will hide our 2D components
-    document.body.classList.add('ar');
+    document.body.classList.add('ar')
 
     // To help with working with 3D on the web, we'll use three.js.
     this.setupThreeJs();
