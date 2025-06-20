@@ -120,7 +120,7 @@ class App {
     }, { enableHighAccuracy:true, timeout:5000 });
 
     // Cargar el modelo 3D desde URL
-    const MODEL_URL = 'https://jeanrua.com/models/Santa_Maria_Prueba_AR.glb';
+    const MODEL_URL = 'https://jeanrua.com/models/Santa_Maria_resized.glb';
     const loader = new THREE.GLTFLoader();
     loader.setCrossOrigin('anonymous');
 
