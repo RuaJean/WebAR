@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Georreferenciada Simple</title>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        #startButton {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            font-size: 16px;
+            background: #ff9a00;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <button id="startButton">Iniciar Experiencia AR</button>
+
+    <a-scene
+        id="scene"
+        style="display:none;"
+        embedded
+        vr-mode-ui="enabled: false"
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+        device-orientation-permission-ui="enabled: true">
+        <a-camera id="cam" gps-new-camera>
+        </a-camera>
+    </a-scene>
+
+    <script>
+        const lugares = [
+            // Coordenadas cercanas (~50‒100 m) a 10.997419, -74.815316 para pruebas locales.
+            { nombre: 'Punto Norte',  lat: 10.997919, lon: -74.815316 },   // +0.0005° lat
+            { nombre: 'Punto Sur',    lat: 10.996919, lon: -74.815316 },   // -0.0005° lat
+            { nombre: 'Punto Este',   lat: 10.997419, lon: -74.814516 },   // +0.0008° lon
+            { nombre: 'Punto Oeste',  lat: 10.997419, lon: -74.816116 }    // -0.0008° lon
+        ];
+
+        const btn = document.getElementById('startButton');
+        btn.addEventListener('click', () => {
+            // Mostrar escena y ocultar botón
+            document.getElementById('scene').style.display = 'block';
+            btn.style.display = 'none';
+
+            // Añadir entidades a la escena y guardarlas para actualización
+            const sceneEl = document.querySelector('a-scene');
+            window.MARCADORES = [];
+
+            lugares.forEach((lugar, idx) => {
+                const wrapper = document.createElement('a-entity');
+                wrapper.setAttribute('gps-new-entity-place', `latitude: ${lugar.lat}; longitude: ${lugar.lon}`);
+
+                // Flecha (cono apuntando hacia arriba)
+                const flecha = document.createElement('a-cone');
+                flecha.setAttribute('height', '4');
+                flecha.setAttribute('radius-bottom', '0.6');
+                flecha.setAttribute('radius-top', '0');
+                flecha.setAttribute('color', '#ff5252');
+                flecha.setAttribute('position', '0 1 0');
+                wrapper.appendChild(flecha);
+
+                // Texto descriptivo
+                const texto = document.createElement('a-text');
+                texto.setAttribute('value', lugar.nombre);
+                texto.setAttribute('align', 'center');
+                texto.setAttribute('color', '#ffffff');
+                texto.setAttribute('look-at', '[gps-new-camera]');
+                texto.setAttribute('position', '0 3 0');
+                texto.setAttribute('scale', '10 10 10');
+                wrapper.appendChild(texto);
+
+                sceneEl.appendChild(wrapper);
+                window.MARCADORES.push(wrapper);
+            });
+
+            // gps-camera ya maneja geolocalización, podemos agregar un listener opcional para debug.
+            const cameraEl = document.querySelector('#cam');
+            cameraEl.addEventListener('gps-camera-update-position', e => {
+                console.log('Posición actualizada:', e.detail.position); // Para depurar
+            });
+        });
+
+        navigator.geolocation.getCurrentPosition(
+            p=>console.log('GPS OK',p.coords),
+            e=>console.error('GPS ERROR',e),
+            {enableHighAccuracy:true,timeout:10000}
+        )
+    </script>
+</body>
+</html>

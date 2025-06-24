@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Georreferenciada Simple</title>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        #startButton {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            font-size: 16px;
+            background: #ff9a00;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <button id="startButton">Iniciar Experiencia AR</button>
+
+    <a-scene
+        id="scene"
+        style="display:none;"
+        embedded
+        vr-mode-ui="enabled: false"
+        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+        device-orientation-permission-ui="enabled: true">
+        <a-camera gps-camera></a-camera>
+    </a-scene>
+
+    <script>
+        const lugares = [
+            // Coordenadas cercanas (~50‒100 m) a 10.997419, -74.815316 para pruebas locales.
+            { nombre: 'Punto Norte',  lat: 10.997919, lon: -74.815316 },   // +0.0005° lat
+            { nombre: 'Punto Sur',    lat: 10.996919, lon: -74.815316 },   // -0.0005° lat
+            { nombre: 'Punto Este',   lat: 10.997419, lon: -74.814516 },   // +0.0008° lon
+            { nombre: 'Punto Oeste',  lat: 10.997419, lon: -74.816116 }    // -0.0008° lon
+        ];
+
+        const btn = document.getElementById('startButton');
+        btn.addEventListener('click', () => {
+            // Mostrar escena y ocultar botón
+            document.getElementById('scene').style.display = 'block';
+            btn.style.display = 'none';
+
+            // Añadir entidades a la escena
+            const sceneEl = document.querySelector('a-scene');
+            lugares.forEach(lugar => {
+                const wrapper = document.createElement('a-entity');
+                wrapper.setAttribute('gps-entity-place', `latitude: ${lugar.lat}; longitude: ${lugar.lon}`);
+
+                // Flecha (cono apuntando hacia arriba)
+                const flecha = document.createElement('a-cone');
+                flecha.setAttribute('height', '2');
+                flecha.setAttribute('radius-bottom', '0.5');
+                flecha.setAttribute('radius-top', '0');
+                flecha.setAttribute('color', '#ff5252');
+                flecha.setAttribute('position', '0 1 0');
+                wrapper.appendChild(flecha);
+
+                // Texto descriptivo
+                const texto = document.createElement('a-text');
+                texto.setAttribute('value', lugar.nombre);
+                texto.setAttribute('align', 'center');
+                texto.setAttribute('color', '#ffffff');
+                texto.setAttribute('look-at', '[gps-camera]');
+                texto.setAttribute('position', '0 3 0');
+                texto.setAttribute('scale', '5 5 5');
+                wrapper.appendChild(texto);
+
+                sceneEl.appendChild(wrapper);
+            });
+        });
+    </script>
+</body>
+</html> 

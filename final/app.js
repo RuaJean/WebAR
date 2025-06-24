@@ -108,6 +108,9 @@ class App {
     loader.load(this.modelUrl, (gltf) => {
       const model = gltf.scene;
 
+      // Escalamos el modelo para que sea más pequeño.
+      model.scale.setScalar(this.modelScale);
+
       // Habilitar sombras en todas las mallas del modelo.
       model.traverse((node) => {
         if (node.isMesh) {
@@ -215,6 +218,7 @@ class App {
     // Agregamos propiedades para controlar la carga única del modelo
     this.modelPlaced = false;
     this.modelUrl = 'https://jeanrua.com/models/Santa_Maria_resized.glb';
+    this.modelScale = 0.05; // Factor de escala para reducir el tamaño del modelo
   }
 };
 

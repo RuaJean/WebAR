@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AR Georreferenciada - Casa Low-Poly</title>
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@3.4.5/aframe/build/aframe-ar.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1a2980, #26d0ce);
+            height: 100vh;
+            color: white;
+            position: relative;
+        }
+        
+        .header {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 20px;
+            text-align: center;
+            position: relative;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+            color: #ff9a00;
+        }
+        
+        .header p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            transition: opacity 0.5s;
+        }
+        
+        .loading-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            max-width: 500px;
+            padding: 30px;
+        }
+        
+        .spinner {
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 5px solid #ff9a00;
+            width: 60px;
+            height: 60px;
+            animation: spin 1.5s linear infinite;
+            margin-bottom: 25px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-overlay h2 {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: #ff9a00;
+        }
+        
+        .loading-overlay p {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            opacity: 0.9;
+        }
+        
+        .progress-container {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            height: 100%;
+            background: #ff9a00;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+            padding: 0 20px;
+        }
+        
+        .instructions-content {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 12px;
+            padding: 15px;
+            max-width: 600px;
+            margin: 0 auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+        
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #4fc3f7;
+        }
+        
+        .instructions p {
+            font-size: 0.95rem;
+            margin-bottom: 5px;
+        }
+        
+        .action-button {
+            background: linear-gradient(to right, #ff9a00, #ff5252);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            margin-top: 15px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(255, 154, 0, 0.4);
+            transition: all 0.3s ease;
+        }
+        
+        .simulate-button {
+            background: linear-gradient(to right, #2196f3, #21cbf3);
+            margin-top: 10px;
+        }
+        
+        .action-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(255, 154, 0, 0.6);
+        }
+        
+        .arjs-loader {
+            display: none !important;
+        }
+        
+        a-scene {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Forzar que el canvas de A-Frame ocupe toda la pantalla */
+        .a-canvas {
+            height: 100% !important;
+            width: 100% !important;
+        }
+        
+        /* Asegurar que el video de AR.js cubra toda la pantalla */
+        .arjs-video, video#arjs-video, #arjs-video {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            object-fit: cover !important;
+            z-index: -1;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 15px;
+            font-size: 1rem;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .status-dot.active {
+            background: #4caf50;
+            box-shadow: 0 0 8px #4caf50;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-dot.inactive {
+            background: #f44336;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        .debug-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 100;
+            max-width: 400px;
+        }
+        
+        .gps-info {
+            background: rgba(0, 0, 0, 0.7);
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 100;
+        }
+        
+        .distance-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 100;
+            font-weight: bold;
+            color: #ff9a00;
+            text-align: center;
+            display: none;
+        }
+        
+        .error-message {
+            background: rgba(255, 82, 82, 0.8);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Realidad Aumentada Georreferenciada</h1>
+        <p>Visualización de Casa Low-Poly en tu ubicación</p>
+    </div>
+    
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <h2>Cargando Experiencia AR</h2>
+            <p id="loading-status">Inicializando sistema de geolocalización...</p>
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot inactive" id="gps-status"></div>
+                <span>Esperando señal GPS</span>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot inactive" id="camera-status"></div>
+                <span>Esperando acceso a cámara</span>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot inactive" id="model-status"></div>
+                <span>Cargando modelo 3D</span>
+            </div>
+            <div class="error-message" id="gps-error">
+                Error de geolocalización. Asegúrate de que la ubicación está activada y los permisos concedidos.
+            </div>
+            <button class="action-button" id="start-ar" style="display: none;">Iniciar Experiencia AR</button>
+            <button class="action-button simulate-button" id="simulate-ar" style="display: none;">Modo Simulación</button>
+        </div>
+    </div>
+    
+    <div class="debug-panel" id="debug-panel">
+        <h4>Información de Depuración</h4>
+        <p id="debug-info">Iniciando aplicación...</p>
+    </div>
+    
+    <div class="gps-info" id="gps-info">
+        <p>Obteniendo ubicación...</p>
+    </div>
+    
+    <div class="distance-indicator" id="distance-indicator">
+        Modelo a <span id="distance-value">0</span> metros
+    </div>
+
+    <a-scene 
+        vr-mode-ui="enabled: false"
+        renderer="precision: high; antialias: true; alpha: true"
+        id="ar-scene">
+        
+        <!-- Cámara: Se ha quitado look-controls para evitar conflictos con la orientación del dispositivo -->
+        <a-camera id="main-camera"></a-camera>
+
+        <!-- Modelo 3D principal -->
+        <a-entity
+            id="model-3d"
+            gltf-model="https://jeanrua.com/models/Santa_Maria_resized.glb"
+            scale="1 1 1"
+            rotation="0 180 0"
+            position="0 0 -20"
+            look-at="[camera]"
+            shadow="receive: false">
+        </a-entity>
+        
+        <!-- Indicador de posición del modelo -->
+        <a-entity
+            id="model-indicator"
+            geometry="primitive: circle; radius: 2; segments: 32"
+            material="color: #ff9a00; shader: flat; opacity: 0.8"
+            position="0 0.1 0"
+            visible="false">
+        </a-entity>
+        
+        <!-- Luces para mejorar la visualización -->
+        <a-entity light="type: ambient; color: #cccccc; intensity: 0.9"></a-entity>
+        <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="1 1 1"></a-entity>
+    </a-scene>
+
+    <script>
+        // Elementos del DOM
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const progressBar = document.getElementById('progress-bar');
+        const loadingStatus = document.getElementById('loading-status');
+        const startButton = document.getElementById('start-ar');
+        const simulateButton = document.getElementById('simulate-ar');
+        const debugPanel = document.getElementById('debug-panel');
+        const debugInfo = document.getElementById('debug-info');
+        const gpsInfo = document.getElementById('gps-info');
+        const distanceIndicator = document.getElementById('distance-indicator');
+        const distanceValue = document.getElementById('distance-value');
+        const gpsError = document.getElementById('gps-error');
+        
+        // Elementos de estado
+        const gpsStatus = document.getElementById('gps-status');
+        const cameraStatus = document.getElementById('camera-status');
+        const modelStatus = document.getElementById('model-status');
+        
+        // Variables de estado
+        let modelLoaded = false;
+        let cameraActive = false;
+        let gpsActive = false;
+        let progress = 0;
+        let arStarted = false;
+        let userPosition = null;
+        let watchId = null;
+        let isSimulation = false;
+        let appReady = false;
+        
+        // Coordenadas del modelo
+        const modelCoords = {
+            latitude: 39.46641,
+            longitude: -0.4320802,
+            altitude: 0
+        };
+        
+        // Actualizar panel de depuración
+        function updateDebug(message) {
+            debugInfo.textContent = message;
+            console.log(message);
+        }
+        
+        // Actualizar información GPS
+        function updateGpsInfo(lat, lon, accuracy) {
+            gpsInfo.innerHTML = `
+                <p><strong>Tu ubicación:</strong></p>
+                <p>Lat: ${lat.toFixed(6)}</p>
+                <p>Lon: ${lon.toFixed(6)}</p>
+                <p>Precisión: ${Math.round(accuracy)} metros</p>
+            `;
+        }
+        
+        // Calcular distancia entre dos puntos geográficos (en metros) - Fórmula de Haversine
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; // Radio de la Tierra en metros
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+            
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            
+            return R * c;
+        }
+        
+        // Calcular dirección (rumbo) entre dos puntos geográficos
+        function calculateBearing(lat1, lon1, lat2, lon2) {
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const λ1 = lon1 * Math.PI/180;
+            const λ2 = lon2 * Math.PI/180;
+            
+            const y = Math.sin(λ2 - λ1) * Math.cos(φ2);
+            const x = Math.cos(φ1) * Math.sin(φ2) -
+                      Math.sin(φ1) * Math.cos(φ2) * Math.cos(λ2 - λ1);
+            const θ = Math.atan2(y, x);
+            
+            return (θ * 180 / Math.PI + 360) % 360; // en grados
+        }
+        
+        // Posicionar el modelo basado en la ubicación del usuario
+        function positionModel() {
+            if (!userPosition) return;
+            
+            // Calcular distancia al modelo
+            const distance = calculateDistance(
+                userPosition.coords.latitude, 
+                userPosition.coords.longitude,
+                modelCoords.latitude,
+                modelCoords.longitude
+            );
+            
+            // Calcular dirección al modelo
+            const bearing = calculateBearing(
+                userPosition.coords.latitude, 
+                userPosition.coords.longitude,
+                modelCoords.latitude,
+                modelCoords.longitude
+            );
+            
+            // Convertir a coordenadas en el espacio 3D
+            // Suponemos que 1 unidad = 1 metro
+            const angleRad = (bearing - 90) * Math.PI / 180;
+            const x = Math.cos(angleRad) * distance;
+            const z = Math.sin(angleRad) * distance;
+            
+            // Actualizar posición del modelo
+            const model = document.getElementById('model-3d');
+            model.setAttribute('position', {x: x, y: 0, z: -z});
+            
+            // Actualizar indicador de distancia
+            distanceValue.textContent = Math.round(distance);
+            distanceIndicator.style.display = 'block';
+            
+            // Actualizar información de depuración
+            updateDebug(`Modelo posicionado a ${Math.round(distance)} metros, rumbo ${Math.round(bearing)}°`);
+        }
+        
+        // Manejar actualización de ubicación
+        function handlePositionUpdate(position) {
+            userPosition = position;
+            updateGpsInfo(
+                position.coords.latitude, 
+                position.coords.longitude,
+                position.coords.accuracy
+            );
+            
+            // Actualizar estado GPS
+            gpsStatus.className = 'status-dot active';
+            gpsActive = true;
+            gpsError.style.display = 'none';
+            
+            // Posicionar el modelo si AR está iniciado
+            if (arStarted) {
+                positionModel();
+            }
+        }
+        
+        // Manejar errores de geolocalización
+        function handlePositionError(error) {
+            let message = '';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message = "Permiso denegado. Por favor habilita la ubicación en tu navegador.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = "Información de ubicación no disponible.";
+                    break;
+                case error.TIMEOUT:
+                    message = "Tiempo de espera agotado al obtener la ubicación.";
+                    break;
+                default:
+                    message = "Error desconocido al obtener la ubicación.";
+            }
+            
+            updateDebug("Error de geolocalización: " + message);
+            gpsInfo.innerHTML = `<p style="color:#ff5252">${message}</p>`;
+            gpsStatus.className = 'status-dot inactive';
+            gpsError.textContent = message;
+            gpsError.style.display = 'block';
+        }
+        
+        // Iniciar seguimiento de ubicación
+        function startGeoTracking() {
+            if (navigator.geolocation) {
+                const options = {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                };
+                
+                // Obtener posición inicial
+                navigator.geolocation.getCurrentPosition(
+                    handlePositionUpdate,
+                    handlePositionError,
+                    options
+                );
+                
+                // Seguimiento continuo
+                watchId = navigator.geolocation.watchPosition(
+                    handlePositionUpdate,
+                    handlePositionError,
+                    options
+                );
+                
+                updateDebug("Seguimiento GPS iniciado");
+            } else {
+                const message = "Geolocalización no soportada por este navegador";
+                updateDebug(message);
+                gpsInfo.innerHTML = `<p style="color:#ff5252">${message}</p>`;
+                gpsStatus.className = 'status-dot inactive';
+                gpsError.textContent = message;
+                gpsError.style.display = 'block';
+            }
+        }
+        
+        // Detener seguimiento de ubicación
+        function stopGeoTracking() {
+            if (watchId && navigator.geolocation) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                updateDebug("Seguimiento GPS detenido");
+            }
+        }
+        
+        // Simular progreso de carga
+        function simulateProgress() {
+            if (appReady) return;
+            
+            progress += Math.random() * 5;
+            if (progress >= 95) progress = 95; // No dejamos que llegue al 100% solo
+            
+            progressBar.style.width = `${progress}%`;
+            
+            if (progress < 50) {
+                loadingStatus.textContent = 'Inicializando componentes...';
+            } else {
+                loadingStatus.textContent = 'Cargando modelo 3D...';
+            }
+            
+            setTimeout(simulateProgress, 400);
+        }
+        
+        // Comprueba si los componentes están listos para iniciar la AR
+        function checkAndStart() {
+            updateDebug(`Checkeo: Cámara=${cameraActive}, GPS=${gpsActive}, Simulación=${isSimulation}`);
+            // En modo simulación, solo necesitamos la cámara.
+            // En modo real, necesitamos cámara y GPS.
+            if (cameraActive && (gpsActive || isSimulation)) {
+                loadingOverlay.style.opacity = '0';
+                setTimeout(() => {
+                    loadingOverlay.style.display = 'none';
+                    arStarted = true;
+                    
+                    // Forzar redimensión para arreglar el problema de la pantalla a la mitad
+                    updateDebug('Forzando redimensión de la escena para asegurar pantalla completa.');
+                    window.dispatchEvent(new Event('resize'));
+                    
+                    if (isSimulation) {
+                        // Simular ubicación cerca del modelo
+                        userPosition = {
+                            coords: {
+                                latitude: modelCoords.latitude + 0.0001,
+                                longitude: modelCoords.longitude,
+                                accuracy: 10
+                            }
+                        };
+                        gpsInfo.innerHTML = `<p><strong>Modo Simulación Activado</strong></p>
+                                          <p>Modelo visible a corta distancia</p>`;
+                        positionModel();
+                    }
+                    
+                    // Mostrar elementos de la UI de AR
+                    gpsInfo.style.display = 'block';
+                    debugPanel.style.display = 'block';
+                    distanceIndicator.style.display = 'block';
+                    
+                    updateDebug(`Experiencia AR iniciada ${isSimulation ? '(Simulación)' : ''}`);
+                }, 500);
+            }
+        }
+        
+        // Inicia la cámara y el geotracking
+        function startAR(simulation = false) {
+            isSimulation = simulation;
+            loadingStatus.textContent = 'Activando permisos...';
+            
+            const scene = document.querySelector('a-scene');
+
+            // 1. Escuchar cuando la cámara está lista (con fallback)
+            let cameraReady = false;
+            const cameraTimeout = 4000; // 4 segundos
+
+            scene.addEventListener('arjs-video-loaded', function () {
+                if (cameraReady) return;
+                cameraReady = true;
+                updateDebug('Cámara activada (evento arjs-video-loaded)');
+                cameraStatus.className = 'status-dot active';
+                cameraActive = true;
+                checkAndStart();
+            });
+            
+            // Fallback por si el evento no se dispara
+            setTimeout(() => {
+                if (cameraReady) return;
+                cameraReady = true;
+                updateDebug('Cámara activada (fallback por timeout)');
+                cameraStatus.className = 'status-dot active';
+                cameraActive = true;
+                checkAndStart();
+            }, cameraTimeout);
+            
+            // 2. Activar AR.js (esto pedirá permiso de cámara)
+            // Se han quitado las propiedades de tracking de marcadores
+            scene.setAttribute('arjs', 'sourceType: webcam; videoTexture: true; debugUIEnabled: false; trackingMethod: best;');
+
+            // 3. Activar GPS si no es simulación
+            if (!isSimulation) {
+                startGeoTracking();
+            } else {
+                // En simulación, el GPS se considera "listo" al instante
+                gpsStatus.className = 'status-dot active';
+                checkAndStart(); // Llama para el estado inicial
+            }
+        }
+        
+        // Iniciar experiencia AR
+        startButton.addEventListener('click', function() {
+            startAR(false);
+        });
+        
+        // Iniciar modo simulación
+        simulateButton.addEventListener('click', function() {
+            startAR(true);
+        });
+        
+        // Verificar eventos de la escena
+        document.querySelector('a-scene').addEventListener('loaded', function() {
+            updateDebug('Escena AR cargada correctamente');
+        });
+        
+        // Manejar eventos del modelo
+        const model = document.getElementById('model-3d');
+        
+        model.addEventListener('model-loaded', function() {
+            updateDebug('Modelo 3D cargado correctamente');
+            modelStatus.className = 'status-dot active';
+            modelLoaded = true;
+
+            appReady = true;
+            progressBar.style.width = '100%';
+            loadingStatus.textContent = '¡Todo listo! Haz clic en Iniciar';
+            document.querySelector('.spinner').style.display = 'none';
+            startButton.style.display = 'block';
+            simulateButton.style.display = 'block';
+        });
+        
+        model.addEventListener('error', function(evt) {
+            updateDebug('Error cargando modelo: ' + evt.detail);
+            modelStatus.className = 'status-dot inactive';
+            appReady = true;
+            loadingStatus.textContent = 'Error al cargar el modelo. Intenta recargar.';
+            document.querySelector('.spinner').style.display = 'none';
+        });
+        
+        // Iniciar simulación de progreso
+        simulateProgress();
+        
+        // Manejar cambios de orientación del dispositivo
+        // NOTA: El evento 'deviceorientation' está siendo marcado como obsoleto en algunos navegadores,
+        // pero sigue siendo la forma más compatible por ahora para este tipo de funcionalidad manual.
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', function(event) {
+                if (!arStarted) return;
+                
+                // Actualizar la rotación de la cámara basada en la brújula
+                // Esto mejora la precisión de la dirección
+                const camera = document.getElementById('main-camera');
+                if (camera && event.alpha !== null) {
+                    // Compensar por la orientación del dispositivo
+                    const adjustedAlpha = event.alpha + (window.orientation || 0);
+                    camera.setAttribute('rotation', {
+                        x: 0,
+                        y: -adjustedAlpha,
+                        z: 0
+                    });
+                    
+                    // Si tenemos ubicación, reposicionar el modelo
+                    if (userPosition) {
+                        positionModel();
+                    }
+                }
+            }, true);
+        } else {
+            updateDebug("DeviceOrientation no soportado");
+        }
+    </script>
+</body>
+</html>
