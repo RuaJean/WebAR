@@ -3,101 +3,304 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR Georreferenciada Simple</title>
+    <title>AR Valencia - Ubicación Fija</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/three.js/build/ar-threex-location-only.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.5/aframe/build/aframe-ar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: Arial, sans-serif; 
+            background: #1a1a1a;
+        }
         #startButton {
             position: absolute;
             top: 20px;
             left: 50%;
             transform: translateX(-50%);
-            padding: 12px 24px;
-            font-size: 16px;
-            background: #ff9a00;
-            color: #fff;
+            padding: 15px 30px;
+            font-size: 18px;
+            background: linear-gradient(to right, #ff9a00, #ff5252);
+            color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 30px;
             cursor: pointer;
             z-index: 10;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        #startButton:hover {
+            transform: translateX(-50%) scale(1.05);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            z-index: 5;
+            display: none;
+        }
+        #instructions {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: white;
+            background: rgba(0,0,0,0.6);
+            padding: 15px;
+            font-size: 16px;
+            z-index: 9;
+            display: none;
+        }
+        .point-info {
+            position: absolute;
+            top: 70px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 8;
+            display: none;
+        }
+        #calibrationInfo {
+            position: absolute;
+            top: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 8;
+            display: none;
+            text-align: center;
         }
     </style>
 </head>
 <body>
     <button id="startButton">Iniciar Experiencia AR</button>
+    <div id="loading">Cargando recursos...</div>
+    <div id="instructions">Mueve tu dispositivo para encontrar los puntos de interés</div>
+    <div class="point-info" id="pointInfo"></div>
+    <div id="calibrationInfo">Calibrando sensores...</div>
 
     <a-scene
         id="scene"
         style="display:none;"
-        embedded
         vr-mode-ui="enabled: false"
-        arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+        arjs="sourceType: webcam; debugUIEnabled: false;"
         device-orientation-permission-ui="enabled: true">
-        <a-camera id="cam" gps-new-camera>
-        </a-camera>
+        <!-- Cámara con posición fija y control por sensores -->
+        <a-camera id="camera" position="0 1.6 0" rotation="0 0 0"></a-camera>
     </a-scene>
 
     <script>
+        // Coordenadas fijas del usuario
+        const userPosition = {
+            lat: 10.997222,
+            lon: -74.815
+        };
+
+        // Puntos de interés
         const lugares = [
-            // Coordenadas cercanas (~50‒100 m) a 10.997419, -74.815316 para pruebas locales.
-            { nombre: 'Punto Norte',  lat: 10.997919, lon: -74.815316 },   // +0.0005° lat
-            { nombre: 'Punto Sur',    lat: 10.996919, lon: -74.815316 },   // -0.0005° lat
-            { nombre: 'Punto Este',   lat: 10.997419, lon: -74.814516 },   // +0.0008° lon
-            { nombre: 'Punto Oeste',  lat: 10.997419, lon: -74.816116 }    // -0.0008° lon
+            { nombre: 'Iglesia',  lat: 10.9978, lon: -74.8142, color: '#ff5252' },
+            { nombre: 'Parque',   lat: 10.9969, lon: -74.8156, color: '#4caf50' },
+            { nombre: 'Dielmo',   lat: 10.9974, lon: -74.8161, color: '#2196f3' },
+            { nombre: 'Colegio',  lat: 10.9980, lon: -74.8150, color: '#ff9800' }
         ];
 
         const btn = document.getElementById('startButton');
-        btn.addEventListener('click', () => {
-            // Mostrar escena y ocultar botón
-            document.getElementById('scene').style.display = 'block';
+        const loading = document.getElementById('loading');
+        const instructions = document.getElementById('instructions');
+        const pointInfo = document.getElementById('pointInfo');
+        const calibrationInfo = document.getElementById('calibrationInfo');
+        
+        btn.addEventListener('click', async () => {
+            // Mostrar carga
+            loading.style.display = 'block';
             btn.style.display = 'none';
-
-            // Añadir entidades a la escena y guardarlas para actualización
-            const sceneEl = document.querySelector('a-scene');
-            window.MARCADORES = [];
-
-            lugares.forEach((lugar, idx) => {
-                const wrapper = document.createElement('a-entity');
-                wrapper.setAttribute('gps-new-entity-place', `latitude: ${lugar.lat}; longitude: ${lugar.lon}`);
-
-                // Flecha (cono apuntando hacia arriba)
-                const flecha = document.createElement('a-cone');
-                flecha.setAttribute('height', '4');
-                flecha.setAttribute('radius-bottom', '0.6');
-                flecha.setAttribute('radius-top', '0');
-                flecha.setAttribute('color', '#ff5252');
-                flecha.setAttribute('position', '0 1 0');
-                wrapper.appendChild(flecha);
-
-                // Texto descriptivo
-                const texto = document.createElement('a-text');
-                texto.setAttribute('value', lugar.nombre);
-                texto.setAttribute('align', 'center');
-                texto.setAttribute('color', '#ffffff');
-                texto.setAttribute('look-at', '[gps-new-camera]');
-                texto.setAttribute('position', '0 3 0');
-                texto.setAttribute('scale', '10 10 10');
-                wrapper.appendChild(texto);
-
-                sceneEl.appendChild(wrapper);
-                window.MARCADORES.push(wrapper);
+            calibrationInfo.style.display = 'block';
+            
+            // Pequeña espera para recursos
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Mostrar escena y ocultar botón
+            const sceneEl = document.getElementById('scene');
+            sceneEl.style.display = 'block';
+            loading.style.display = 'none';
+            instructions.style.display = 'block';
+            
+            // Función para calcular distancia entre dos puntos geográficos
+            function calculateDistance(lat1, lon1, lat2, lon2) {
+                const R = 6371000; // Radio de la Tierra en metros
+                const dLat = (lat2 - lat1) * Math.PI / 180;
+                const dLon = (lon2 - lon1) * Math.PI / 180;
+                const a = 
+                    Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                return R * c; // Distancia en metros
+            }
+            
+            // Función para calcular posición relativa en coordenadas 3D
+            function calculateRelativePosition(lat, lon, userLat, userLon) {
+                // Calcular diferencia en grados
+                const dLat = lat - userLat;
+                const dLon = lon - userLon;
+                
+                // Convertir a metros (aproximación para distancias cortas)
+                const metersPerDegreeLat = 111320; // ~111.32 km por grado de latitud
+                const metersPerDegreeLon = 111320 * Math.cos(userLat * Math.PI / 180);
+                
+                // Calcular coordenadas relativas (X: este-oeste, Z: norte-sur)
+                const x = dLon * metersPerDegreeLon;
+                const z = -dLat * metersPerDegreeLat; // Negativo porque norte es -Z en A-Frame
+                
+                return { x, y: 0, z };
+            }
+            
+            // Crear puntos de interés usando posición relativa
+            lugares.forEach((lugar) => {
+                const position = calculateRelativePosition(
+                    lugar.lat, lugar.lon, 
+                    userPosition.lat, userPosition.lon
+                );
+                
+                // Distancia al punto
+                const distance = calculateDistance(
+                    userPosition.lat, userPosition.lon,
+                    lugar.lat, lugar.lon
+                );
+                
+                // Contenedor para alinear flecha y texto
+                const container = document.createElement('a-entity');
+                container.setAttribute('position', `${position.x} 0 ${position.z}`);
+                container.setAttribute('class', 'point-marker');
+                container.setAttribute('visible', 'true');
+                
+                // Flecha apuntando hacia abajo - TAMAÑO GRANDE
+                const flecha = document.createElement('a-entity');
+                flecha.setAttribute('geometry', 'primitive: cone; height: 1.8; radiusBottom: 0.6; radiusTop: 0.1');
+                flecha.setAttribute('material', `color: ${lugar.color}`);
+                flecha.setAttribute('rotation', '0 0 180'); // Rotar 180° para apuntar hacia abajo
+                flecha.setAttribute('position', '0 1.5 0');
+                
+                // Texto descriptivo - TAMAÑO GRANDE
+                const texto = document.createElement('a-entity');
+                texto.setAttribute('text', {
+                    value: `${lugar.nombre}\n${distance.toFixed(0)}m`,
+                    align: 'center',
+                    color: '#ffffff',
+                    width: 8,
+                    height: 1.5,
+                    wrapCount: 20,
+                    font: 'roboto'
+                });
+                texto.setAttribute('position', '0 -1.5 0');
+                texto.setAttribute('background', 'color: rgba(0,0,0,0.7); padding: 0.8');
+                texto.setAttribute('look-at', '[camera]');
+                
+                // Línea que conecta flecha y texto
+                const linea = document.createElement('a-entity');
+                linea.setAttribute('geometry', 'primitive: cylinder; height: 2.5; radius: 0.05');
+                linea.setAttribute('material', `color: ${lugar.color}`);
+                linea.setAttribute('position', '0 0 0');
+                linea.setAttribute('rotation', '90 0 0');
+                
+                // Añadir elementos al contenedor
+                container.appendChild(flecha);
+                container.appendChild(texto);
+                container.appendChild(linea);
+                
+                // Evento para mostrar información al mirar
+                container.addEventListener('mouseenter', () => {
+                    pointInfo.style.display = 'block';
+                    pointInfo.textContent = `Viendo: ${lugar.nombre} (${distance.toFixed(0)}m)`;
+                    pointInfo.style.backgroundColor = lugar.color;
+                });
+                
+                container.addEventListener('mouseleave', () => {
+                    pointInfo.style.display = 'none';
+                });
+                
+                sceneEl.appendChild(container);
             });
-
-            // gps-camera ya maneja geolocalización, podemos agregar un listener opcional para debug.
-            const cameraEl = document.querySelector('#cam');
-            cameraEl.addEventListener('gps-camera-update-position', e => {
-                console.log('Posición actualizada:', e.detail.position); // Para depurar
-            });
+            
+            // Calibración de sensores (simulada)
+            setTimeout(() => {
+                calibrationInfo.style.display = 'none';
+            }, 2500);
+            
+            // Control de la cámara con sensores de movimiento
+            const cameraEl = document.getElementById('camera');
+            let alpha = 0, beta = 0, gamma = 0;
+            
+            function handleOrientation(event) {
+                alpha = event.alpha;  // Compás (0-360)
+                beta = event.beta;    // Inclinación frontal (-180 a 180)
+                gamma = event.gamma;  // Inclinación lateral (-90 a 90)
+                
+                // Convertir ángulos a grados A-Frame
+                const yRotation = alpha;  // Rotación en eje Y
+                const xRotation = beta - 90;  // Rotación en eje X
+                const zRotation = gamma; // Rotación en eje Z
+                
+                // Actualizar rotación de la cámara
+                cameraEl.setAttribute('rotation', `${xRotation} ${yRotation} ${zRotation}`);
+            }
+            
+            // Solicitar permiso para sensores
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                        } else {
+                            alert('Se necesitan permisos de sensores para la experiencia AR');
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // Navegadores que no requieren permiso
+                window.addEventListener('deviceorientation', handleOrientation);
+            }
         });
-
-        navigator.geolocation.getCurrentPosition(
-            p=>console.log('GPS OK',p.coords),
-            e=>console.error('GPS ERROR',e),
-            {enableHighAccuracy:true,timeout:10000}
-        )
+        
+        // Información sobre los puntos
+        let infoHTML = '<h3>Puntos de interés:</h3><ul>';
+        lugares.forEach(lugar => {
+            // Calcular distancia
+            const distance = Math.round(calculateDistance(
+                userPosition.lat, userPosition.lon,
+                lugar.lat, lugar.lon
+            ));
+            
+            infoHTML += `<li style="color:${lugar.color}">${lugar.nombre} (${distance}m)</li>`;
+        });
+        infoHTML += '</ul>';
+        document.querySelector('.point-info').innerHTML = infoHTML;
+        
+        // Función para calcular distancia (para la lista)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // Radio de la Tierra en metros
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c; // Distancia en metros
+        }
     </script>
 </body>
 </html>
