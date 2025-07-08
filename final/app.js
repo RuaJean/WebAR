@@ -1,22 +1,3 @@
-/*
- * Copyright 2017 Google Inc. All Rights Reserved.
- * Licensed under the Apache License, Version 2.0 (the 'License');
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an 'AS IS' BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
-/**
- * Query for WebXR support. If there's no support for the `immersive-ar` mode,
- * show an error.
- */
 (async function() {
   const isArSessionSupported = navigator.xr && navigator.xr.isSessionSupported && await navigator.xr.isSessionSupported("immersive-ar");
   if (isArSessionSupported) {
@@ -94,44 +75,14 @@ class App {
 
   /** Place a sunflower when the screen is tapped. */
   onSelect = () => {
-    // Si el modelo ya está colocado, no hacemos nada.
-    if (this.modelPlaced) {
-      return;
-    }
+    if (window.sunflower) {
+      const clone = window.sunflower.clone();
+      clone.position.copy(this.reticle.position);
+      this.scene.add(clone)
 
-    // Marcamos que el modelo se está colocando para evitar dobles cargas.
-    this.modelPlaced = true;
-
-    // Cargar el modelo GLB y añadirlo a la escena.
-    const loader = new THREE.GLTFLoader();
-    loader.setCrossOrigin('anonymous');
-    loader.load(this.modelUrl, (gltf) => {
-      const model = gltf.scene;
-
-      // Escalamos el modelo para que sea más pequeño.
-      model.scale.setScalar(this.modelScale);
-
-      // Habilitar sombras en todas las mallas del modelo.
-      model.traverse((node) => {
-        if (node.isMesh) {
-          node.castShadow = true;
-          node.receiveShadow = true;
-        }
-      });
-
-      // Posicionar el modelo donde está el retículo.
-      model.position.copy(this.reticle.position);
-      this.scene.add(model);
-
-      // Ocultamos el retículo una vez colocado el modelo.
-      this.reticle.visible = false;
-
-      // Ajustar el plano receptor de sombras a la altura del modelo.
       const shadowMesh = this.scene.children.find(c => c.name === 'shadowMesh');
-      if (shadowMesh) {
-        shadowMesh.position.y = model.position.y;
-      }
-    });
+      shadowMesh.position.y = clone.position.y;
+    }
   }
 
   /**
@@ -170,16 +121,13 @@ class App {
         this.stabilized = true;
         document.body.classList.add('stabilized');
       }
-      if (hitTestResults.length > 0 && !this.modelPlaced) {
+      if (hitTestResults.length > 0) {
         const hitPose = hitTestResults[0].getPose(this.localReferenceSpace);
 
         // Update the reticle position
         this.reticle.visible = true;
         this.reticle.position.set(hitPose.transform.position.x, hitPose.transform.position.y, hitPose.transform.position.z)
         this.reticle.updateMatrixWorld(true);
-      }
-      if (this.modelPlaced) {
-        this.reticle.visible = false;
       }
 
       // Render the scene with THREE.WebGLRenderer.
@@ -214,11 +162,6 @@ class App {
     // to handle the matrices independently.
     this.camera = new THREE.PerspectiveCamera();
     this.camera.matrixAutoUpdate = false;
-
-    // Agregamos propiedades para controlar la carga única del modelo
-    this.modelPlaced = false;
-    this.modelUrl = 'https://jeanrua.com/models/Santa_Maria_resized.glb';
-    this.modelScale = 0.05; // Factor de escala para reducir el tamaño del modelo
   }
 };
 
